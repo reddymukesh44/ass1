@@ -10,7 +10,7 @@ $(TARGET): $(SRC)
 	$(CC) $(CFLAGS) -o $(TARGET) $(SRC) $(LIBS)
 
 run: $(TARGET)
-	./$(TARGET)
+	./$(TARGET) $(ARGS)
 
 clean:
 	rm -f $(TARGET)
