@@ -1,5 +1,5 @@
-8 # number of data points
-1 1 # 2-dimention data point (x, y)
+8
+1 1
 3 1
 1 10
 3 10
@@ -7,7 +7,7 @@
 23 1
 21 6
 23 6
-3 # number of clusters
-2 6 # a centroid
+3
+2 6
 22 2
 22 6
