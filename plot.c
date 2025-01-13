@@ -60,53 +60,96 @@ int parse_centroids(FILE *fp, DataSet *data_set) {
 }
 
 static void draw_function(GtkDrawingArea *area, cairo_t *cr, int width, int height, gpointer user_data) {
-    // Clear background
     cairo_set_source_rgb(cr, 1, 1, 1);
     cairo_paint(cr);
 
-    // Calculate scaling factors to fit all points
-    double max_x = 0, max_y = 0;
-    for (int i = 0; i < global_data_set.num_data_points; i++) {
-        if (global_data_set.data_points[i].x > max_x) max_x = global_data_set.data_points[i].x;
-        if (global_data_set.data_points[i].y > max_y) max_y = global_data_set.data_points[i].y;
+    int margin = 40;
+    int graph_width = width - 2 * margin;
+    int graph_height = height - 2 * margin;
+
+    double scale_x = graph_width / 2.0;
+    double scale_y = graph_height / 2.0;
+
+    cairo_set_source_rgba(cr, 0.8, 0.8, 0.8, 1.0);
+    cairo_set_line_width(cr, 0.5);
+
+    for (double x = -1.0; x <= 1.0; x += 0.25) {
+        double screen_x = margin + (x + 1.0) * scale_x;
+        cairo_move_to(cr, screen_x, margin);
+        cairo_line_to(cr, screen_x, height - margin);
     }
-    for (int i = 0; i < global_data_set.num_clusters; i++) {
-        if (global_data_set.centroids[i].x > max_x) max_x = global_data_set.centroids[i].x;
-        if (global_data_set.centroids[i].y > max_y) max_y = global_data_set.centroids[i].y;
+    
+    for (double y = -0.75; y <= 1.0; y += 0.25) {
+        double screen_y = height - margin - (y + 1.0) * scale_y;
+        cairo_move_to(cr, margin, screen_y);
+        cairo_line_to(cr, width - margin, screen_y);
     }
-
-    // Add padding
-    max_x += 2;
-    max_y += 2;
-
-    double scale_x = (width - 40) / max_x;
-    double scale_y = (height - 40) / max_y;
-    double scale = scale_x < scale_y ? scale_x : scale_y;
-
-    // Draw coordinate axes
-    cairo_set_source_rgb(cr, 0, 0, 0);
-    cairo_set_line_width(cr, 1);
-    cairo_move_to(cr, 20, height - 20);
-    cairo_line_to(cr, width - 20, height - 20);
-    cairo_move_to(cr, 20, height - 20);
-    cairo_line_to(cr, 20, 20);
     cairo_stroke(cr);
 
-    // Draw data points in blue
+    cairo_set_source_rgb(cr, 0, 0, 0);
+    cairo_set_line_width(cr, 1.0);
+
+    cairo_move_to(cr, margin + scale_x, margin);
+    cairo_line_to(cr, margin + scale_x, height - margin);
+
+    cairo_move_to(cr, margin, height - margin - scale_y);
+    cairo_line_to(cr, width - margin, height - margin - scale_y);
+    cairo_stroke(cr);
+
+    cairo_set_font_size(cr, 12);
+    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+
+    for (double x = -1.0; x <= 1.0; x += 0.5) {
+        char label[10];
+        snprintf(label, sizeof(label), "%.1f", x);
+        double screen_x = margin + (x + 1.0) * scale_x;
+        cairo_move_to(cr, screen_x - 10, height - margin + 20);
+        cairo_show_text(cr, label);
+    }
+
+    for (double y = -0.75; y <= 1.0; y += 0.25) {
+        char label[10];
+        snprintf(label, sizeof(label), "%.2f", y);
+        double screen_y = height - margin - (y + 1.0) * scale_y;
+        cairo_move_to(cr, margin - 35, screen_y + 5);
+        cairo_show_text(cr, label);
+    }
+
+    double max_x = 0, max_y = 0;
+    for (int i = 0; i < global_data_set.num_data_points; i++) {
+        if (abs(global_data_set.data_points[i].x) > max_x) 
+            max_x = abs(global_data_set.data_points[i].x);
+        if (abs(global_data_set.data_points[i].y) > max_y)
+            max_y = abs(global_data_set.data_points[i].y);
+    }
+    for (int i = 0; i < global_data_set.num_clusters; i++) {
+        if (abs(global_data_set.centroids[i].x) > max_x)
+            max_x = abs(global_data_set.centroids[i].x);
+        if (abs(global_data_set.centroids[i].y) > max_y)
+            max_y = abs(global_data_set.centroids[i].y);
+    }
+
     cairo_set_source_rgb(cr, 0, 0, 1);
     for (int i = 0; i < global_data_set.num_data_points; i++) {
-        double x = 20 + global_data_set.data_points[i].x * scale;
-        double y = height - 20 - global_data_set.data_points[i].y * scale;
-        cairo_arc(cr, x, y, 5, 0, 2 * M_PI);
+        double normalized_x = global_data_set.data_points[i].x / max_x;
+        double normalized_y = global_data_set.data_points[i].y / max_y;
+        
+        double screen_x = margin + (normalized_x + 1.0) * scale_x;
+        double screen_y = height - margin - (normalized_y + 1.0) * scale_y;
+        
+        cairo_arc(cr, screen_x, screen_y, 3, 0, 2 * M_PI);
         cairo_fill(cr);
     }
 
-    // Draw centroids in red
     cairo_set_source_rgb(cr, 1, 0, 0);
     for (int i = 0; i < global_data_set.num_clusters; i++) {
-        double x = 20 + global_data_set.centroids[i].x * scale;
-        double y = height - 20 - global_data_set.centroids[i].y * scale;
-        cairo_rectangle(cr, x - 5, y - 5, 10, 10);
+        double normalized_x = global_data_set.centroids[i].x / max_x;
+        double normalized_y = global_data_set.centroids[i].y / max_y;
+        
+        double screen_x = margin + (normalized_x + 1.0) * scale_x;
+        double screen_y = height - margin - (normalized_y + 1.0) * scale_y;
+        
+        cairo_rectangle(cr, screen_x - 4, screen_y - 4, 8, 8);
         cairo_fill(cr);
     }
 }
