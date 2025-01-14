@@ -2,10 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cairo.h>
+#include <math.h>
 
 typedef struct {
-    int x;
-    int y;
+    double x;
+    double y;
 } Point;
 
 typedef struct {
@@ -31,7 +32,7 @@ int parse_data_points(FILE *fp, DataSet *data_set) {
     char line[256];
     for (int i = 0; i < data_set->num_data_points; i++) {
         if (fgets(line, sizeof(line), fp)) {
-            sscanf(line, "%d %d", &data_set->data_points[i].x, &data_set->data_points[i].y);
+            sscanf(line, "%lf %lf", &data_set->data_points[i].x, &data_set->data_points[i].y);
         } else {
             fprintf(stderr, "Error reading data point %d.\n", i + 1);
             return 0;
@@ -50,7 +51,7 @@ int parse_centroids(FILE *fp, DataSet *data_set) {
     char line[256];
     for (int i = 0; i < data_set->num_clusters; i++) {
         if (fgets(line, sizeof(line), fp)) {
-            sscanf(line, "%d %d", &data_set->centroids[i].x, &data_set->centroids[i].y);
+            sscanf(line, "%lf %lf", &data_set->centroids[i].x, &data_set->centroids[i].y);
         } else {
             fprintf(stderr, "Error reading centroid %d.\n", i + 1);
             return 0;
@@ -60,6 +61,7 @@ int parse_centroids(FILE *fp, DataSet *data_set) {
 }
 
 static void draw_function(GtkDrawingArea *area, cairo_t *cr, int width, int height, gpointer user_data) {
+    // Set white background
     cairo_set_source_rgb(cr, 1, 1, 1);
     cairo_paint(cr);
 
@@ -67,18 +69,19 @@ static void draw_function(GtkDrawingArea *area, cairo_t *cr, int width, int heig
     int graph_width = width - 2 * margin;
     int graph_height = height - 2 * margin;
 
+    // Find maximum values for scaling
     double max_x = 0, max_y = 0;
     for (int i = 0; i < global_data_set.num_data_points; i++) {
-        if (abs(global_data_set.data_points[i].x) > max_x) 
-            max_x = abs(global_data_set.data_points[i].x);
-        if (abs(global_data_set.data_points[i].y) > max_y)
-            max_y = abs(global_data_set.data_points[i].y);
+        if (fabs(global_data_set.data_points[i].x) > max_x) 
+            max_x = fabs(global_data_set.data_points[i].x);
+        if (fabs(global_data_set.data_points[i].y) > max_y)
+            max_y = fabs(global_data_set.data_points[i].y);
     }
     for (int i = 0; i < global_data_set.num_clusters; i++) {
-        if (abs(global_data_set.centroids[i].x) > max_x)
-            max_x = abs(global_data_set.centroids[i].x);
-        if (abs(global_data_set.centroids[i].y) > max_y)
-            max_y = abs(global_data_set.centroids[i].y);
+        if (fabs(global_data_set.centroids[i].x) > max_x)
+            max_x = fabs(global_data_set.centroids[i].x);
+        if (fabs(global_data_set.centroids[i].y) > max_y)
+            max_y = fabs(global_data_set.centroids[i].y);
     }
 
     max_x = ceil(max_x);
@@ -87,22 +90,24 @@ static void draw_function(GtkDrawingArea *area, cairo_t *cr, int width, int heig
     double scale_x = graph_width / (2 * max_x);
     double scale_y = graph_height / (2 * max_y);
 
+    // Draw grid lines
     cairo_set_source_rgba(cr, 0.8, 0.8, 0.8, 1.0);
     cairo_set_line_width(cr, 0.5);
 
-    for (int x = -max_x; x <= max_x; x += max_x/4) {
+    for (double x = -max_x; x <= max_x; x += max_x/4) {
         double screen_x = margin + (x + max_x) * scale_x;
         cairo_move_to(cr, screen_x, margin);
         cairo_line_to(cr, screen_x, height - margin);
     }
     
-    for (int y = -max_y; y <= max_y; y += max_y/4) {
+    for (double y = -max_y; y <= max_y; y += max_y/4) {
         double screen_y = height - margin - (y + max_y) * scale_y;
         cairo_move_to(cr, margin, screen_y);
         cairo_line_to(cr, width - margin, screen_y);
     }
     cairo_stroke(cr);
 
+    // Draw axes
     cairo_set_source_rgb(cr, 0, 0, 0);
     cairo_set_line_width(cr, 1.0);
 
@@ -115,25 +120,27 @@ static void draw_function(GtkDrawingArea *area, cairo_t *cr, int width, int heig
     cairo_line_to(cr, width - margin, zero_y);
     cairo_stroke(cr);
 
+    // Draw axis labels
     cairo_set_font_size(cr, 12);
     cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
 
-    for (int x = -max_x; x <= max_x; x += max_x/2) {
+    for (double x = -max_x; x <= max_x; x += max_x/4) {
         char label[10];
-        snprintf(label, sizeof(label), "%d", x);
+        snprintf(label, sizeof(label), "%.1f", x);
         double screen_x = margin + (x + max_x) * scale_x;
         cairo_move_to(cr, screen_x - 10, height - margin + 20);
         cairo_show_text(cr, label);
     }
 
-    for (int y = -max_y; y <= max_y; y += max_y/4) {
+    for (double y = -max_y; y <= max_y; y += max_y/4) {
         char label[10];
-        snprintf(label, sizeof(label), "%d", y);
+        snprintf(label, sizeof(label), "%.1f", y);
         double screen_y = height - margin - (y + max_y) * scale_y;
         cairo_move_to(cr, margin - 35, screen_y + 5);
         cairo_show_text(cr, label);
     }
 
+    // Draw data points (blue circles)
     cairo_set_source_rgb(cr, 0, 0, 1);
     for (int i = 0; i < global_data_set.num_data_points; i++) {
         double screen_x = margin + (global_data_set.data_points[i].x + max_x) * scale_x;
@@ -143,6 +150,7 @@ static void draw_function(GtkDrawingArea *area, cairo_t *cr, int width, int heig
         cairo_fill(cr);
     }
 
+    // Draw centroids (red squares)
     cairo_set_source_rgb(cr, 1, 0, 0);
     for (int i = 0; i < global_data_set.num_clusters; i++) {
         double screen_x = margin + (global_data_set.centroids[i].x + max_x) * scale_x;
@@ -187,11 +195,11 @@ static void on_open(GApplication *app, GFile **files, gint n_files, const gchar 
 
         printf("Number of data points: %d\n", global_data_set.num_data_points);
         for (int j = 0; j < global_data_set.num_data_points; j++) {
-            printf("Data Point %d: (%d, %d)\n", j + 1, global_data_set.data_points[j].x, global_data_set.data_points[j].y);
+            printf("Data Point %d: (%.2f, %.2f)\n", j + 1, global_data_set.data_points[j].x, global_data_set.data_points[j].y);
         }
         printf("Number of clusters: %d\n", global_data_set.num_clusters);
         for (int j = 0; j < global_data_set.num_clusters; j++) {
-            printf("Centroid %d: (%d, %d)\n", j + 1, global_data_set.centroids[j].x, global_data_set.centroids[j].y);
+            printf("Centroid %d: (%.2f, %.2f)\n", j + 1, global_data_set.centroids[j].x, global_data_set.centroids[j].y);
         }
 
         fclose(fp);
