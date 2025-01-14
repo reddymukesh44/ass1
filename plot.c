@@ -67,54 +67,6 @@ static void draw_function(GtkDrawingArea *area, cairo_t *cr, int width, int heig
     int graph_width = width - 2 * margin;
     int graph_height = height - 2 * margin;
 
-    double scale_x = graph_width / 2.0;
-    double scale_y = graph_height / 2.0;
-
-    cairo_set_source_rgba(cr, 0.8, 0.8, 0.8, 1.0);
-    cairo_set_line_width(cr, 0.5);
-
-    for (double x = -1.0; x <= 1.0; x += 0.25) {
-        double screen_x = margin + (x + 1.0) * scale_x;
-        cairo_move_to(cr, screen_x, margin);
-        cairo_line_to(cr, screen_x, height - margin);
-    }
-    
-    for (double y = -0.75; y <= 1.0; y += 0.25) {
-        double screen_y = height - margin - (y + 1.0) * scale_y;
-        cairo_move_to(cr, margin, screen_y);
-        cairo_line_to(cr, width - margin, screen_y);
-    }
-    cairo_stroke(cr);
-
-    cairo_set_source_rgb(cr, 0, 0, 0);
-    cairo_set_line_width(cr, 1.0);
-
-    cairo_move_to(cr, margin + scale_x, margin);
-    cairo_line_to(cr, margin + scale_x, height - margin);
-
-    cairo_move_to(cr, margin, height - margin - scale_y);
-    cairo_line_to(cr, width - margin, height - margin - scale_y);
-    cairo_stroke(cr);
-
-    cairo_set_font_size(cr, 12);
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-
-    for (double x = -1.0; x <= 1.0; x += 0.5) {
-        char label[10];
-        snprintf(label, sizeof(label), "%.1f", x);
-        double screen_x = margin + (x + 1.0) * scale_x;
-        cairo_move_to(cr, screen_x - 10, height - margin + 20);
-        cairo_show_text(cr, label);
-    }
-
-    for (double y = -0.75; y <= 1.0; y += 0.25) {
-        char label[10];
-        snprintf(label, sizeof(label), "%.2f", y);
-        double screen_y = height - margin - (y + 1.0) * scale_y;
-        cairo_move_to(cr, margin - 35, screen_y + 5);
-        cairo_show_text(cr, label);
-    }
-
     double max_x = 0, max_y = 0;
     for (int i = 0; i < global_data_set.num_data_points; i++) {
         if (abs(global_data_set.data_points[i].x) > max_x) 
@@ -129,13 +81,63 @@ static void draw_function(GtkDrawingArea *area, cairo_t *cr, int width, int heig
             max_y = abs(global_data_set.centroids[i].y);
     }
 
+    max_x = ceil(max_x);
+    max_y = ceil(max_y);
+
+    double scale_x = graph_width / (2 * max_x);
+    double scale_y = graph_height / (2 * max_y);
+
+    cairo_set_source_rgba(cr, 0.8, 0.8, 0.8, 1.0);
+    cairo_set_line_width(cr, 0.5);
+
+    for (int x = -max_x; x <= max_x; x += max_x/4) {
+        double screen_x = margin + (x + max_x) * scale_x;
+        cairo_move_to(cr, screen_x, margin);
+        cairo_line_to(cr, screen_x, height - margin);
+    }
+    
+    for (int y = -max_y; y <= max_y; y += max_y/4) {
+        double screen_y = height - margin - (y + max_y) * scale_y;
+        cairo_move_to(cr, margin, screen_y);
+        cairo_line_to(cr, width - margin, screen_y);
+    }
+    cairo_stroke(cr);
+
+    cairo_set_source_rgb(cr, 0, 0, 0);
+    cairo_set_line_width(cr, 1.0);
+
+    double zero_x = margin + max_x * scale_x;
+    cairo_move_to(cr, zero_x, margin);
+    cairo_line_to(cr, zero_x, height - margin);
+
+    double zero_y = height - margin - max_y * scale_y;
+    cairo_move_to(cr, margin, zero_y);
+    cairo_line_to(cr, width - margin, zero_y);
+    cairo_stroke(cr);
+
+    cairo_set_font_size(cr, 12);
+    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+
+    for (int x = -max_x; x <= max_x; x += max_x/2) {
+        char label[10];
+        snprintf(label, sizeof(label), "%d", x);
+        double screen_x = margin + (x + max_x) * scale_x;
+        cairo_move_to(cr, screen_x - 10, height - margin + 20);
+        cairo_show_text(cr, label);
+    }
+
+    for (int y = -max_y; y <= max_y; y += max_y/4) {
+        char label[10];
+        snprintf(label, sizeof(label), "%d", y);
+        double screen_y = height - margin - (y + max_y) * scale_y;
+        cairo_move_to(cr, margin - 35, screen_y + 5);
+        cairo_show_text(cr, label);
+    }
+
     cairo_set_source_rgb(cr, 0, 0, 1);
     for (int i = 0; i < global_data_set.num_data_points; i++) {
-        double normalized_x = global_data_set.data_points[i].x / max_x;
-        double normalized_y = global_data_set.data_points[i].y / max_y;
-        
-        double screen_x = margin + (normalized_x + 1.0) * scale_x;
-        double screen_y = height - margin - (normalized_y + 1.0) * scale_y;
+        double screen_x = margin + (global_data_set.data_points[i].x + max_x) * scale_x;
+        double screen_y = height - margin - (global_data_set.data_points[i].y + max_y) * scale_y;
         
         cairo_arc(cr, screen_x, screen_y, 3, 0, 2 * M_PI);
         cairo_fill(cr);
@@ -143,11 +145,8 @@ static void draw_function(GtkDrawingArea *area, cairo_t *cr, int width, int heig
 
     cairo_set_source_rgb(cr, 1, 0, 0);
     for (int i = 0; i < global_data_set.num_clusters; i++) {
-        double normalized_x = global_data_set.centroids[i].x / max_x;
-        double normalized_y = global_data_set.centroids[i].y / max_y;
-        
-        double screen_x = margin + (normalized_x + 1.0) * scale_x;
-        double screen_y = height - margin - (normalized_y + 1.0) * scale_y;
+        double screen_x = margin + (global_data_set.centroids[i].x + max_x) * scale_x;
+        double screen_y = height - margin - (global_data_set.centroids[i].y + max_y) * scale_y;
         
         cairo_rectangle(cr, screen_x - 4, screen_y - 4, 8, 8);
         cairo_fill(cr);
